@@ -19,7 +19,6 @@ RUN rm -rf ./datomic-pro.zip
 FROM eclipse-temurin:22.0.1_8-jre-ubi9-minimal as final
 
 COPY --from=build /datomic-pro /datomic-pro
-COPY configure_and_start.sh /datomic-pro/configure_and_start.sh
 COPY create_datomic_start_up.clj /datomic-pro/create_datomic_start_up.clj
 
 ENV RUN_MODE ""
@@ -89,5 +88,4 @@ ENV DATOMIC_CONSOLE_PORT "8888"
 ENV TRANSACTOR_ALIAS ""
 
 WORKDIR /datomic-pro
-RUN chmod a+x configure_and_start.sh
-ENTRYPOINT ./configure_and_start.sh
+ENTRYPOINT bin/run create_datomic_start_up.clj && ./${BOOTSTRAP_FILE_NAME}
