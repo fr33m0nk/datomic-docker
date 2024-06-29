@@ -1,20 +1,11 @@
 (require '[datomic.api :as d])
 (import '[clojure.lang ExceptionInfo])
 
-(def DATOMIC_DB_NAME (System/getenv "DATOMIC_DB_NAME"))
-
-(def PG_HOST (System/getenv "PG_HOST"))
-
-(def PG_PORT (System/getenv "PG_PORT"))
-
-(def PG_DATABASE (System/getenv "PG_DATABASE"))
-
-(def PG_USER (System/getenv "PG_USER"))
-
-(def PG_PASSWORD (System/getenv "PG_PASSWORD"))
-
-(def uri (format "datomic:sql://%s?jdbc:postgresql://%s:%s/%s?user=%s&password=%s"
-           DATOMIC_DB_NAME PG_HOST PG_PORT PG_DATABASE PG_USER PG_PASSWORD))
+(def uri (format "datomic:sql://%s?%s?user=%s&password=%s"
+                 (System/getenv "DATOMIC_DB_NAME")
+                 (System/getenv "SQL_JDBC_URL")
+                 (System/getenv "SQL_USER")
+                 (System/getenv "SQL_PASSWORD")))
 
 (defn database-migrator
   [uri]

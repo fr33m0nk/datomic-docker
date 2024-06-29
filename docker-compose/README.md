@@ -28,7 +28,8 @@ docker compose up --build transactor peer datomic-db-initialization console -d
 (require '[datomic.api :as d])
 ;; nil
 
-(def db-uri (format "datomic:sql://%s?jdbc:postgresql://localhost:5432/datomic?user=datomic&password=datomic" DATOMIC_DB_NAME))
+;; assuming DATOMIC DB name is stored in environment variable `DATOMIC_DB_NAME`
+(def db-uri (format "datomic:sql://%s?jdbc:postgresql://localhost:5432/datomic?user=datomic&password=datomic" (System/getenv "DATOMIC_DB_NAME")))
 ;; #'user/db-uri
 
 user=> (d/connect db-uri)
