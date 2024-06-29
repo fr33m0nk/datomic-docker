@@ -45,7 +45,7 @@ services:
       - PGPASSWORD=${POSTGRES_PASSWORD}
     image: postgres:16.1-bullseye
     volumes:
-      - "./postgres-migrations:/migrations"
+      - "./datomic-postgres-migrations:/migrations"
     command: >
       sh -c 'psql -h postgres -f /migrations/postgres-db.sql &&
              psql -h postgres -d datomic -f /migrations/postgres-table.sql &&
