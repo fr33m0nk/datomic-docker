@@ -1,11 +1,19 @@
 (require '[datomic.api :as d])
 (import '[clojure.lang ExceptionInfo])
 
-(def uri (format "datomic:sql://%s?%s?user=%s&password=%s"
-                 (System/getenv "DATOMIC_DB_NAME")
-                 (System/getenv "SQL_JDBC_URL")
-                 (System/getenv "SQL_USER")
-                 (System/getenv "SQL_PASSWORD")))
+(def uri
+  (cond
+    (= (System/getenv "PROTOCOL") "DDB-LOCAL")
+    (format "datomic:ddb-local://%s/%s/%s"
+            (System/getenv "LOCAL_DYNAMO_DB_ENDPOINT")
+            (System/getenv "DYNAMO_DB_TABLE")
+            (System/getenv "DATOMIC_DB_NAME"))
+
+    :else (format "datomic:sql://%s?%s?user=%s&password=%s"
+            (System/getenv "DATOMIC_DB_NAME")
+            (System/getenv "SQL_JDBC_URL")
+            (System/getenv "SQL_USER")
+            (System/getenv "SQL_PASSWORD"))))
 
 (defn database-migrator
   [uri]

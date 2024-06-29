@@ -1,0 +1,174 @@
+version: '3.9'
+name: datomic-cluster
+
+services:
+  memcached:
+    container_name: memcached
+    image: memcached:${MEMCACHED_IMAGE_TAG}
+    command: memcached -m ${MEMCACHED_MAX_RAM}
+    ports:
+      - ${MEMCACHED_HOST_MAPPING_PORT}:11211
+    restart: always
+    networks:
+      datomic-network:
+        ipv4_address: 192.168.200.2
+    healthcheck:
+      test: echo stats | nc 127.0.0.1 11211
+      interval: 10s
+      retries: 60
+
+  scylla-db:
+    container_name: scylla-db
+    image: scylladb/scylla
+    ports:
+      - ${SCYLLA_DB_HOST_MAPPING_PORT}:8000
+    command: "--smp 1 --memory=750M --alternator-port=8000 --alternator-write-isolation=always_use_lwt"
+    volumes:
+      - scylla-db:/var/lib/scylla
+    networks:
+      datomic-network:
+        ipv4_address: 192.168.200.3
+    restart: always
+    healthcheck:
+      test: cqlsh -e "SHOW VERSION" || exit 1
+      interval: 15s
+      retries: 10
+      start_period: 30s
+      timeout: 30s
+
+  transactor:
+    build:
+      context: ../
+      args:
+        DATOMIC_VERSION: ${DATOMIC_VERSION}
+      dockerfile: Dockerfile
+    ports:
+      - "4336:4336"
+      - "4335:4335"
+      - "4334:4334"
+      - "9999:9999"
+    environment:
+      - RUN_MODE=TRANSACTOR
+      - PROTOCOL=${SCYLLA_DB_PROTOCOL}
+      - DYNAMO_DB_TABLE=${DYNAMO_DB_TABLE}
+      - LOCAL_DYNAMO_DB_ENDPOINT=scylla-db:8000
+      - TRANSACTOR_HOST=192.168.200.4
+      - TRANSACTOR_ALT_HOST=127.0.0.1
+      - MEMCACHED_HOST=192.168.200.2
+    volumes:
+      - datomic-transactor-log:/datomic-pro/log
+    healthcheck:
+      test: ["CMD-SHELL", 'if [[ $(curl -s -o /dev/null -w "%{http_code}" -X GET http://transactor:9999/health)  = "200" ]]; then echo 0; else echo 1; fi']
+      interval: 10s
+      timeout: 3s
+      retries: 30
+    networks:
+      datomic-network:
+        ipv4_address: 192.168.200.4
+    restart: always
+    depends_on:
+      scylla-db:
+        condition: service_healthy
+      memcached:
+        condition: service_healthy
+
+  datomic-db-initialization:
+    build:
+      context: ../
+      args:
+        DATOMIC_VERSION: ${DATOMIC_VERSION}
+      dockerfile: Dockerfile
+    environment:
+      - RUN_MODE=TRANSACTOR
+      - PROTOCOL=${SCYLLA_DB_PROTOCOL}
+      - DYNAMO_DB_TABLE=${DYNAMO_DB_TABLE}
+      - LOCAL_DYNAMO_DB_ENDPOINT=scylla-db:8000
+      - DATOMIC_DB_NAME=${DATOMIC_DB_NAME}
+      - RETRIES=${DATOMIC_DB_CREATION_RETRIES}
+    volumes:
+      - "./datomic-database-initialization/initialize_database.clj:/datomic-pro/initialize_database.clj"
+    restart: on-failure:1
+    entrypoint: /datomic-pro/bin/run /datomic-pro/initialize_database.clj
+    networks:
+      datomic-network:
+        ipv4_address: 192.168.200.254
+    depends_on:
+      scylla-db:
+        condition: service_healthy
+      memcached:
+        condition: service_healthy
+      transactor:
+        condition: service_healthy
+
+  peer:
+    build:
+      context: ../
+      args:
+        DATOMIC_VERSION: ${DATOMIC_VERSION}
+      dockerfile: Dockerfile
+    ports:
+      - "8998:8998"
+    environment:
+      - RUN_MODE=PEER
+      - PROTOCOL=${PROTOCOL}
+      - PEER_HOST=192.168.200.5
+      - PROTOCOL=${SCYLLA_DB_PROTOCOL}
+      - DYNAMO_DB_TABLE=${DYNAMO_DB_TABLE}
+      - LOCAL_DYNAMO_DB_ENDPOINT=scylla-db:8000
+      - DATOMIC_DB_NAME=${DATOMIC_DB_NAME}
+      - PEER_ACCESSKEY=${PEER_ACCESSKEY}
+      - PEER_SECRET=${PEER_SECRET}
+      - MEMCACHED_HOST=192.168.200.2
+    restart: always
+    networks:
+      datomic-network:
+        ipv4_address: 192.168.200.5
+    depends_on:
+      scylla-db:
+        condition: service_healthy
+      memcached:
+        condition: service_healthy
+      transactor:
+        condition: service_healthy
+      datomic-db-initialization:
+        condition: service_completed_successfully
+
+  console:
+    build:
+      context: ../
+      args:
+        DATOMIC_VERSION: ${DATOMIC_VERSION}
+      dockerfile: Dockerfile
+    ports:
+      - ${CONSOLE_HOST_MAPPING_PORT}:8888
+    environment:
+      - RUN_MODE=CONSOLE
+      - PROTOCOL=${SCYLLA_DB_PROTOCOL}
+      - DYNAMO_DB_TABLE=${DYNAMO_DB_TABLE}
+      - LOCAL_DYNAMO_DB_ENDPOINT=scylla-db:8000
+      - TRANSACTOR_ALIAS=home-txn
+    networks:
+      datomic-network:
+        ipv4_address: 192.168.200.6
+    restart: always
+    depends_on:
+      scylla-db:
+        condition: service_healthy
+      transactor:
+        condition: service_healthy
+      datomic-db-initialization:
+        condition: service_completed_successfully
+
+
+networks:
+  datomic-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        -
+          subnet: 192.168.200.0/24
+
+volumes:
+  scylla-db:
+  datomic-transactor-log:

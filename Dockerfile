@@ -12,7 +12,7 @@ RUN apk add --no-cache --update \
 RUN curl -fsSL -o datomic-pro.zip https://datomic-pro-downloads.s3.amazonaws.com/${DATOMIC_VERSION}/datomic-pro-${DATOMIC_VERSION}.zip
 RUN unzip -qq ./datomic-pro.zip -d / && true
 RUN mv "/datomic-pro-${DATOMIC_VERSION}" /datomic-pro && true
-RUN curl -fsSL -o /datomic-pro/lib/logstash-logback-encoder-7.4.jar https://repo1.maven.org/maven2/net/logstash/logback/logstash-logback-encoder/7.4/logstash-logback-encoder-7.4.jar
+RUN curl -fsSL -o /datomic-pro/lib/logstash-logback-encoder-7.3.jar https://repo1.maven.org/maven2/net/logstash/logback/logstash-logback-encoder/7.3/logstash-logback-encoder-7.3.jar
 COPY ./artifacts/logback.xml /datomic-pro/bin/logback.xml
 RUN rm -rf ./datomic-pro.zip
 
@@ -60,6 +60,8 @@ ENV SQL_DRIVER_CLASS ""
 # TRANSACTOR DDB-LOCAL Backend
 ENV DYNAMO_DB_TABLE ""
 ENV LOCAL_DYNAMO_DB_ENDPOINT ""
+ENV AWS_ACCESS_KEY_ID="none"
+ENV AWS_SECRET_ACCESS_KEY="none"
 
 # TRANSACTOR DDB Backend
 ENV AWS_DYNAMO_DB_REGION ""

@@ -16,12 +16,20 @@
 
 ## The configuration variables for docker compose file are in [`.env`](./.env) file
 
-## Usage
+## Usage with SQL backend
 
 ### Starting the docker compose 
 1. Start containers
 ```bash
-docker compose up --build transactor peer datomic-db-initialization console -d
+DOCKER_BUILDKIT=1 docker compose up \
+  --build \
+  transactor \
+  datomic-db-initialization \
+  peer \
+  console \
+  --force-recreate \
+  --remove-orphans \
+  -d
 ```
 2. Connect via Datomic peer
 ```clojure
@@ -30,6 +38,53 @@ docker compose up --build transactor peer datomic-db-initialization console -d
 
 ;; assuming DATOMIC DB name is stored in environment variable `DATOMIC_DB_NAME`
 (def db-uri (format "datomic:sql://%s?jdbc:postgresql://localhost:5432/datomic?user=datomic&password=datomic" (System/getenv "DATOMIC_DB_NAME")))
+;; #'user/db-uri
+
+user=> (d/connect db-uri)
+;; #object[datomic.peer.Connection 0x738da6f2 "{:unsent-updates-queue 0, :pending-txes 0, :next-t 1000, :basis-t 66, :index-rev 0, :db-id \"hello-275c1f24-482a-4ae2-86a8-844555f04f46\"}"]
+
+```
+3. Connect via Datomic client
+```clojure
+(require '[datomic.client.api :as dc])
+
+(def client (dd/client {:server-type :peer-server
+                        :access-key "myaccesskey" ;; PEER_ACCESSKEY
+                        :secret "mysecret" ;; PEER_SECRET
+                        :endpoint "localhost:8998"
+                        :validate-hostnames false}))
+;; #'user/client
+
+user=> (dc/connect client {:db-name "test-database"}) ;; DATOMIC_DB_NAME
+{:db-name "hello", :database-id "hello-275c1f24-482a-4ae2-86a8-844555f04f46", :t 66, :next-t 1000, :type :datomic.client/conn}
+
+```
+
+## Usage with Scylla DB backend
+
+### Starting the docker compose
+
+```bash
+DOCKER_BUILDKIT=1 docker compose \
+  -f ./docker-compose-scylla-db.yml \
+  up \
+  --build \
+  transactor \
+  datomic-db-initialization \
+  peer \
+  console \
+  --force-recreate \
+  --remove-orphans \
+  -d
+```
+
+2. Connect via Datomic peer
+```clojure
+(require '[datomic.api :as d])
+;; nil
+
+;; assuming DATOMIC DB name is stored in environment variable `DATOMIC_DB_NAME`
+(def db-uri (format "datomic:ddb-local://localhost:8000/%s" (System/getenv "DATOMIC_DB_NAME")))
 ;; #'user/db-uri
 
 user=> (d/connect db-uri)
